@@ -1,9 +1,10 @@
 import telebot
 from telebot import types
 import requests
+from token_list import  *
 
-token = '5117488486:AAF0B4ugDyroUd5jaNXfWyhruHJAm8UNHc0'
-bot = telebot.TeleBot(token)
+
+bot = telebot.TeleBot(token_bot)
 
 
 @bot.message_handler(commands=['start'])
@@ -47,12 +48,13 @@ def get_text_messages(message):
     #     bot.register_next_step_handler(message, weather)
     elif message.text == '/help':
         keyboard = types.InlineKeyboardMarkup()
+
         key_share = types.InlineKeyboardButton(text='Акции', callback_data='share')
-        keyboard.add(key_share)
         key_weather = types.InlineKeyboardButton(text='Погода', callback_data='weather')
-        keyboard.add(key_weather)
-        key_weather = types.InlineKeyboardButton(text='Привет', callback_data='hello')
-        keyboard.add(key_weather)
+        key_hello = types.InlineKeyboardButton(text='Привет', callback_data='hello')
+        key_translator = types.InlineKeyboardButton(text='Переводчик', callback_data='translator')
+
+        keyboard.add(key_share, key_weather, key_hello,key_translator)
         question = 'Выбирай'
         return bot.send_message(message.from_user.id, text=question, reply_markup=keyboard)
     else:
@@ -71,6 +73,9 @@ def callback_menu(call):
         elif call.data == "hello":
             bot.send_message(call.message.from_user.id, 'Хочешь покажу волшебство? тогда напиши /reg')
             bot.register_next_step_handler(call.message, start)
+        elif call.data == "translator":
+            bot.send_message(call.message.from_user.id, 'Что хочешь перевести?')
+            bot.register_next_step_handler(call.message, translator)
     except AttributeError:
         bot.send_message(call.message.chat.id, 'Что?')
         bot.register_next_step_handler(call.message, get_text_messages)
@@ -80,6 +85,65 @@ name: str = ''
 surname: str = ''
 age: int = 0
 
+@bot.message_handler(content_types=['text'])
+def translator(message):
+    try:
+        word = message.text
+        detect_url = "https://google-translate1.p.rapidapi.com/language/translate/v2/detect"
+        payload = f"q={word}"
+        headers = detected_headers
+        response = requests.request("POST",
+                                    detect_url,
+                                    data=payload.encode('UTF-8'),
+                                    headers=headers)
+        data = response.json()
+        income_lang = data['data']['detections'][0][0]['language']
+        keyboard = types.InlineKeyboardMarkup()
+
+        key_rus = types.InlineKeyboardButton(text='\U0001F1F7\U0001F1F8 русский',
+        callback_data={'word': word, 'income_lang': income_lang, 'outcome_lang': 'ru'})
+        key_eng = types.InlineKeyboardButton(text='\U0001F1EC\U0001F1E7 english',
+        callback_data={'word': word, 'income_lang': income_lang, 'outcome_lang': 'en'})
+        key_esp = types.InlineKeyboardButton(text='\U0001F1EA\U0001F1F8 español',
+        callback_data={'word': word, 'income_lang': income_lang, 'outcome_lang': 'es'})
+        key_fra = types.InlineKeyboardButton(text='\U0001F1EB\U0001F1F7 français',
+        callback_data={'word': word, 'income_lang': income_lang, 'outcome_lang': 'fr'})
+
+        keyboard.add(key_rus, key_eng, key_esp, key_fra)
+        question = 'Выбирай язык'
+        return bot.send_message(message.from_user.id, text=question, reply_markup=keyboard)
+    except:
+        bot.send_message(message.from_user.id, 'Я тебя не понимаю, напиши "/help.')
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_menu(call):
+    try:
+        if call.data['outcome_lang'] == "ru":  # call.data это callback_data, которую мы указали при объявлении кнопки
+            bot.send_message(call.from_user.id, f'Перевожу {call.data["word"]} на русский')
+            outcome = call.data['outcome_lang']
+        elif call.data['outcome_lang'] == "en":
+            bot.send_message(call.from_user.id, f'Перевожу {call.data["word"]} на английский')
+            outcome = call.data['outcome_lang']
+        elif call.data['outcome_lang'] == "es":
+            bot.send_message(call.from_user.id, f'Перевожу {call.data["word"]} на испанский')
+            outcome = call.data['outcome_lang']
+        elif call.data['outcome_lang'] == "fr":
+            bot.send_message(call.from_user.id, f'Перевожу {call.data["word"]} на французкий')
+            outcome = call.data['outcome_lang']
+
+            trans_url = "https://google-translate1.p.rapidapi.com/language/translate/v2"
+            headers = trans_headers
+
+            payload = f"q={call.data['word']}!&target={call.data['outcome_lang']}&source={call.data['income_lang']}"
+
+            response = requests.request("POST", trans_url, data=payload.encode('UTF-8'), headers=headers)
+            data = response.json()
+            result = data['data']['translations'][0]['translatedText']
+            bot.send_message(call.message.chat.id, f'{result}?')
+    except AttributeError:
+                bot.send_message(call.message.chat.id, 'Что?')
+                bot.register_next_step_handler(call.message, get_text_messages)
 
 @bot.message_handler(content_types=['text'])
 def investing(message):
